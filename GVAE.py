@@ -40,7 +40,7 @@ class Model(object):
         self.edge = tf.placeholder(tf.float32, [self.batch_size, self.n_node, self.n_node, self.dim_edge])
         self.property = tf.placeholder(tf.float32, [self.batch_size, self.dim_y])
 
-        self.latent = self._encoder(self.batch_size, self.node, self.edge, self.property, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_z * 2, 0, name='encoder', reuse=False)    
+        self.latent = self._encoder(self.batch_size, self.node, self.edge, self.property, self.n_mpnn_step, self.dim_h, self.dim_h * 2, self.dim_z * 2, 0, name='encoder', reuse=False)
         self.latent_mu, self.latent_lsgms = tf.split(self.latent, [self.dim_z, self.dim_z], 1)
         
         self.latent_epsilon = tf.random_normal([self.batch_size, self.dim_z], 0., 1.)
@@ -155,7 +155,7 @@ class Model(object):
             self.saver.restore(self.sess, load_path)
 
         ## tranining
-        max_epoch = 50
+        max_epoch = 25
         print('::: training')
         trn_log = np.zeros((max_epoch, 8))
         eval_log = np.zeros(max_epoch)
@@ -195,19 +195,16 @@ class Model(object):
             print('--training epoch id: ', epoch, ' trn log: ', trn_log[epoch])  
 
             if epoch > 0:
-                total_count, valid_count, novel_count, unique_count, genmols = self.test(10000, 0, Dsmi, atom_list)
-    
-                valid_count=valid_count - 1e-7
-                valid=valid_count/total_count
-                unique=unique_count/valid_count
-                novel=novel_count/valid_count
-                
-                gmean = (valid * unique * novel) ** (1/3)
+                total_count, genmols = self.test(10000, 0, Dsmi, atom_list)
+
+
+                gmean = 0
                 eval_log[epoch] = gmean
                 
-                print('--evaluation epoch id: ', epoch, 'Total:',total_count, '//Valid:',valid*100,' // Unique:',unique*100,' // Novel:',novel*100, '// Gmean:',gmean*100)
+                print('--evaluation epoch id: ', epoch, 'Total:',total_count,  '// Gmean:',gmean*100)
           
                 if np.max(eval_log[:epoch+1]) == gmean:
+
                     self.saver.save(self.sess, save_path)              
                             
 
@@ -217,7 +214,6 @@ class Model(object):
         newmols=[]
         
         total_count=0
-        valid_count=0
         novel_count=0
         unique_count=0
         for t in range(int(n_gen / self.batch_size)): 
@@ -230,24 +226,11 @@ class Model(object):
             
             for i in range(len(new_node)):
                 total_count+=1
-                try:         
-                    mol = self._vec_to_mol(new_node[i], new_edge[i], atom_list, train=False)
-                    smi = Chem.MolToSmiles(mol, kekuleSmiles=True)
+                mol = self._vec_to_mol(new_node[i], new_edge[i], atom_list, train=False)
 
-                    valid_count+=1
-                    
-                    if smi not in smisuppl:
-                        novel_count+=1
-                        
-                    if smi not in newsuppl:
-                        newsuppl.append(smi)
-                        newmols.append(mol)
-                        unique_count+=1
-
-                except:
-                    pass
+                newmols.append(mol)
         
-        return total_count, valid_count, novel_count, unique_count, newmols
+        return total_count, newmols
         
 
     def _random_cond_normal(self, yid, ytarget):
@@ -313,7 +296,10 @@ class Model(object):
         
         for j in range(m-1):
             for k in range(j+1, m):
-                edmol.AddBond(j, k, ref_bond[edge_bond[j, k]])
+                try:
+                    edmol.AddBond(j, k, ref_bond[edge_bond[j, k]])
+                except:
+                    pass
     
         mol_rec = edmol.GetMol()
         

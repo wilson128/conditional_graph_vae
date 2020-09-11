@@ -33,6 +33,7 @@ elif data=='ZINC':
 
 elif data=='data':
     atom_list = ['C', 'O']
+    # condition the property on 0/1
     target_list = [[], [0, 1]]
 
 data_path = './'+data+'_graph.pkl'
@@ -61,13 +62,8 @@ np.set_printoptions(precision=3, suppress=True)
 with model.sess:
     model.saver.restore(model.sess, save_path)
 
-    print("graph:", model.G)
-    print("node:", model.node)
-    print("edge:", model.edge)
-    print("property:", model.property)
-
     # unconditional generation     
-    total_count, valid_count, novel_count, unique_count, genmols = model.test(10000, 0, Dsmi, atom_list)
+    total_count, genmols = model.test(10000, 0, Dsmi, atom_list)
 
     #print (total_count)
 
@@ -80,7 +76,7 @@ with model.sess:
     list_Y=[]
     for mol in genmols:
         #if dim_edge == 3: Chem.Kekulize(mol)
-        list_Y.append([Descriptors.ExactMolWt(mol), isProperty(Chem.GetAdjacencyMatrix(mol))])
+        list_Y.append([isProperty(Chem.GetAdjacencyMatrix(mol))])
 
     print(':: unconditional generation results', len(genmols), np.mean(list_Y,0), np.std(list_Y,0))
 
@@ -90,7 +86,7 @@ with model.sess:
         
             target_Y_norm=(target_Y-scaler.mean_[target_id])/(scaler.var_[target_id]**0.5)
         
-            total_count, valid_count, novel_count, unique_count, genmols = model.test(10000, 1, Dsmi, atom_list, target_id, target_Y_norm)
+            total_count, genmols = model.test(10000, 1, Dsmi, atom_list, target_id, target_Y_norm)
         
             #valid=valid_count/total_count
             #unique=unique_count/valid_count
@@ -101,6 +97,6 @@ with model.sess:
             list_Y=[]
             for i, mol in enumerate(genmols):
                 #if dim_edge == 3: Chem.Kekulize(mol)
-                list_Y.append([Descriptors.ExactMolWt(mol), isProperty(Chem.GetAdjacencyMatrix(mol))])
+                list_Y.append([isProperty(Chem.GetAdjacencyMatrix(mol))])
             
             print(':: conditional generation results', target_id, target_Y, len(genmols), np.mean(list_Y,0), np.std(list_Y,0))

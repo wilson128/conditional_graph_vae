@@ -22,6 +22,24 @@ def isProperty(adj):
             return 1
     return 0
 
+def detailProperty(adj):
+    nodes = 9 # Number of nodes
+    adj_lt = np.tril(adj) # Lower Triangular form
+    edges = np.sum(adj_lt) # Number of edges
+    avg_degree = 2*edges/nodes
+
+    A3 = adj@adj@adj
+    tri = (1.0/6)*np.trace(A3)
+
+    if 2 <= avg_degree <= 3:
+        if tri >= 2:
+            return 1
+        else:
+            return 2
+    if tri >= 2:
+        return 3
+    else:
+        return 0
 
 def to_onehot(val, cat):
 
@@ -94,8 +112,10 @@ if data=='QM9':
 elif data=='ZINC':
     data_size=100000
     n_max=38
+
     atom_list=['C','N','O','F','P','S','Cl','Br','I']
-    
+
+# load the synthetic dataset
 elif data=='data':
     data_size=2000
     n_max=9
@@ -111,8 +131,18 @@ graphs = pkl.load(open('./'+data+'_smi.pkl','rb'))
 DV = []
 DE = [] 
 DY = []
+DV1 = []
+DE1 = []
+DY1 = []
+DV2 = []
+DE2 = []
+DY2 = []
+DV3 = []
+DE3 = []
+DY3 = []
 Dsmi = []
 for i in range(graphs.shape[0]):
+    print (graphs[i])
     mol = MolFromGraphs(np.array([6, 6, 6, 6, 6, 6, 6, 6, 6], dtype=np.int8), graphs[i])
 
     #if use_AROMATIC == False: Chem.Kekulize(mol)
@@ -133,15 +163,30 @@ for i in range(graphs.shape[0]):
             edge[j, k, :] = bondFeatures(bonds)
             edge[k, j, :] = edge[j, k, :]
 
-    # property DY
-    property = [Descriptors.ExactMolWt(mol), isProperty(graphs[i])]
+    # put two property twice in the label for the sake of co-variance
 
-    print (property)
+    # property DY
+    property = [isProperty(graphs[i]), isProperty(graphs[i])]
 
     # append
     DV.append(node)
     DE.append(edge)
     DY.append(property)
+
+    # separate the input graph into 3 different categories
+
+    if detailProperty(graphs[i]) == 0:
+        DV1.append(node)
+        DE1.append(edge)
+        DY1.append(property)
+    if detailProperty(graphs[i]) == 2:
+        DV2.append(node)
+        DE2.append(edge)
+        DY2.append(property)
+    if detailProperty(graphs[i]) == 3:
+        DV3.append(node)
+        DE3.append(edge)
+        DY3.append(property)
 
     if use_AROMATIC: Dsmi.append(Chem.MolToSmiles(mol))
     else: Dsmi.append(Chem.MolToSmiles(mol, kekuleSmiles=True))
@@ -155,11 +200,21 @@ for i in range(graphs.shape[0]):
 DV = np.asarray(DV, dtype=np.int8)
 DE = np.asarray(DE, dtype=np.int8)
 DY = np.asarray(DY)
+DV1 = np.asarray(DV1, dtype=np.int8)
+DE1 = np.asarray(DE1, dtype=np.int8)
+DY1 = np.asarray(DY1)
+DV2 = np.asarray(DV2, dtype=np.int8)
+DE2 = np.asarray(DE2, dtype=np.int8)
+DY2 = np.asarray(DY2)
+DV3 = np.asarray(DV3, dtype=np.int8)
+DE3 = np.asarray(DE3, dtype=np.int8)
+DY3 = np.asarray(DY3)
 Dsmi = np.asarray(Dsmi)
 
 # compression
 DV = sparse.COO.from_numpy(DV)
 DE = sparse.COO.from_numpy(DE)
+
 
 print (DY)
 
